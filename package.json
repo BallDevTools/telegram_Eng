@@ -1,0 +1,31 @@
+{
+  "name": "telegram-membership-bot",
+  "version": "1.0.0",
+  "description": "Telegram bot for managing crypto membership NFT on BSC Testnet",
+  "main": "index.js",
+  "scripts": {
+    "start": "node index.js",
+    "dev": "node index.js",
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "keywords": [
+    "telegram",
+    "bot",
+    "crypto",
+    "nft",
+    "membership",
+    "bsc",
+    "blockchain"
+  ],
+  "author": "",
+  "license": "MIT",
+  "dependencies": {
+    "dotenv": "^16.3.1",
+    "ethers": "^6.8.1",
+    "node-telegram-bot-api": "^0.64.0"
+  },
+  "engines": {
+    "node": ">=16.0.0"
+  }
+}
+
