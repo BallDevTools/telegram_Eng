@@ -1,0 +1,820 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Auto Connect Wallet - Crypto Membership</title>
+    <!-- Add Telegram WebApp script -->
+    <script src="https://telegram.org/js/telegram-web-app.js"></script>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            padding: 20px;
+        }
+        
+        .container {
+            background: white;
+            border-radius: 16px;
+            padding: 30px;
+            box-shadow: 0 20px 40px rgba(0,0,0,0.1);
+            text-align: center;
+            max-width: 450px;
+            width: 100%;
+        }
+        
+        h1 {
+            color: #333;
+            margin-bottom: 10px;
+            font-size: 24px;
+        }
+        
+        .subtitle {
+            color: #666;
+            margin-bottom: 30px;
+            font-size: 14px;
+        }
+        
+        .auto-detect-section {
+            margin: 20px 0;
+            padding: 20px;
+            background: #f0f8ff;
+            border-radius: 12px;
+            border: 2px solid #4CAF50;
+        }
+        
+        .wallet-detected {
+            background: #e8f5e8;
+            border-color: #4CAF50;
+        }
+        
+        .auto-connect-btn {
+            display: block;
+            width: 100%;
+            padding: 15px 20px;
+            margin: 15px 0;
+            border: none;
+            border-radius: 12px;
+            background: linear-gradient(135deg, #4CAF50, #45a049);
+            color: white;
+            font-weight: 600;
+            font-size: 18px;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            box-shadow: 0 4px 15px rgba(76, 175, 80, 0.3);
+        }
+        
+        .auto-connect-btn:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 8px 25px rgba(76, 175, 80, 0.4);
+        }
+        
+        .auto-connect-btn:disabled {
+            background: #ccc;
+            cursor: not-allowed;
+            transform: none;
+            box-shadow: none;
+        }
+        
+        .wallet-info {
+            margin: 15px 0;
+            padding: 15px;
+            background: #fff;
+            border-radius: 8px;
+            border: 1px solid #ddd;
+        }
+        
+        .status {
+            margin: 20px 0;
+            padding: 15px;
+            border-radius: 8px;
+            font-weight: 600;
+        }
+        
+        .status.detecting {
+            background: #e3f2fd;
+            color: #1976d2;
+            border: 1px solid #bbdefb;
+        }
+        
+        .status.connecting {
+            background: #fff3cd;
+            color: #856404;
+            border: 1px solid #ffeaa7;
+        }
+        
+        .status.connected {
+            background: #d4edda;
+            color: #155724;
+            border: 1px solid #c3e6cb;
+        }
+        
+        .status.error {
+            background: #f8d7da;
+            color: #721c24;
+            border: 1px solid #f5c6cb;
+        }
+        
+        .manual-section {
+            margin-top: 30px;
+            padding: 20px;
+            background: #f8f9fa;
+            border-radius: 12px;
+            border-top: 3px solid #6c757d;
+        }
+        
+        .wallet-button {
+            display: block;
+            width: 100%;
+            padding: 12px 20px;
+            margin: 8px 0;
+            border: 2px solid #e0e0e0;
+            border-radius: 10px;
+            background: white;
+            color: #333;
+            font-weight: 600;
+            font-size: 14px;
+            cursor: pointer;
+            transition: all 0.3s ease;
+        }
+        
+        .wallet-button:hover {
+            border-color: #4285f4;
+            transform: translateY(-1px);
+        }
+        
+        .countdown {
+            font-size: 24px;
+            font-weight: bold;
+            color: #4CAF50;
+            margin: 10px 0;
+        }
+        
+        .detected-wallets {
+            margin: 20px 0;
+            text-align: left;
+        }
+        
+        .wallet-item {
+            display: flex;
+            align-items: center;
+            padding: 10px;
+            margin: 5px 0;
+            background: #fff;
+            border-radius: 8px;
+            border: 1px solid #ddd;
+        }
+        
+        .wallet-item.active {
+            border-color: #4CAF50;
+            background: #f0f8f0;
+        }
+        
+        .skip-button {
+            margin-top: 20px;
+            padding: 10px 20px;
+            background: #6c757d;
+            color: white;
+            border: none;
+            border-radius: 8px;
+            cursor: pointer;
+            font-size: 14px;
+        }
+        
+        .progress-bar {
+            width: 100%;
+            height: 8px;
+            background: #e0e0e0;
+            border-radius: 4px;
+            overflow: hidden;
+            margin: 15px 0;
+        }
+        
+        .progress-fill {
+            height: 100%;
+            background: linear-gradient(90deg, #4CAF50, #45a049);
+            width: 0%;
+            transition: width 0.3s ease;
+        }
+        
+        .hidden {
+            display: none;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🚀 Smart Wallet Connect</h1>
+        <p class="subtitle">Automatically detecting and connecting your wallet...</p>
+        
+        <div id="status" class="status detecting">
+            🔍 Scanning for available wallets...
+        </div>
+        
+        <!-- Auto Detection Section -->
+        <div class="auto-detect-section" id="auto-detect">
+            <h3>🎯 Auto Detection</h3>
+            <div class="progress-bar">
+                <div class="progress-fill" id="progress"></div>
+            </div>
+            <div class="countdown" id="countdown">5</div>
+            <p>Auto-connecting to detected wallet in <span id="countdown-text">5</span> seconds...</p>
+            
+            <div class="detected-wallets" id="detected-wallets">
+                <!-- Detected wallets will appear here -->
+            </div>
+            
+            <button class="auto-connect-btn" id="auto-connect-btn" onclick="connectDetectedWallet()">
+                🔗 Connect Now
+            </button>
+            
+            <button class="skip-button" onclick="skipAutoConnect()">
+                ⏭️ Skip Auto Connect
+            </button>
+        </div>
+        
+        <!-- Wallet Info Section -->
+        <div class="wallet-info hidden" id="wallet-info">
+            <h3>💼 Connected Wallet</h3>
+            <p><strong>Address:</strong> <span id="wallet-address">-</span></p>
+            <p><strong>Network:</strong> <span id="wallet-network">-</span></p>
+            <p><strong>Balance:</strong> <span id="wallet-balance">Loading...</span></p>
+        </div>
+        
+        <!-- Manual Section -->
+        <div class="manual-section hidden" id="manual-section">
+            <h3>📱 Manual Connection</h3>
+            <p style="margin-bottom: 15px;">Choose a wallet to connect manually:</p>
+            
+            <div id="manual-wallets">
+                <button class="wallet-button" onclick="connectWallet('metamask')">
+                    🦊 MetaMask
+                </button>
+                <button class="wallet-button" onclick="connectWallet('trust')">
+                    🛡️ Trust Wallet
+                </button>
+                <button class="wallet-button" onclick="connectWallet('coinbase')">
+                    🔵 Coinbase Wallet
+                </button>
+                <button class="wallet-button" onclick="connectWallet('walletconnect')">
+                    🔗 WalletConnect
+                </button>
+            </div>
+        </div>
+        
+        <!-- Transaction Section -->
+        <div class="hidden" id="transaction-section">
+            <h3>💳 Ready for Transactions</h3>
+            <button class="auto-connect-btn" onclick="simulateTransaction()">
+                💰 Test Transaction
+            </button>
+        </div>
+    </div>
+
+    <script>
+        let detectedWallets = [];
+        let selectedWallet = null;
+        let autoConnectTimer = null;
+        let countdownTimer = null;
+        let countdown = 5;
+        let walletConnectURI = null;
+
+        // Get URL parameters
+        const urlParams = new URLSearchParams(window.location.search);
+        const userId = urlParams.get('userId');
+        const sessionId = urlParams.get('sessionId');
+        const uri = urlParams.get('uri');
+
+        if (uri) {
+            walletConnectURI = decodeURIComponent(uri);
+        }
+
+        // Initialize wallet detection
+        window.addEventListener('load', function() {
+            detectWallets();
+        });
+
+        async function detectWallets() {
+            showStatus('🔍 Detecting available wallets...', 'detecting');
+            
+            detectedWallets = [];
+            
+            // Detect MetaMask
+            if (typeof window.ethereum !== 'undefined') {
+                if (window.ethereum.isMetaMask) {
+                    detectedWallets.push({
+                        name: 'MetaMask',
+                        icon: '🦊',
+                        provider: window.ethereum,
+                        type: 'injected'
+                    });
+                }
+                
+                // Detect other injected wallets
+                if (window.ethereum.isTrust) {
+                    detectedWallets.push({
+                        name: 'Trust Wallet',
+                        icon: '🛡️',
+                        provider: window.ethereum,
+                        type: 'injected'
+                    });
+                }
+                
+                if (window.ethereum.isCoinbaseWallet) {
+                    detectedWallets.push({
+                        name: 'Coinbase Wallet',
+                        icon: '🔵',
+                        provider: window.ethereum,
+                        type: 'injected'
+                    });
+                }
+            }
+            
+            // Detect WalletConnect capability
+            if (walletConnectURI) {
+                detectedWallets.push({
+                    name: 'WalletConnect',
+                    icon: '🔗',
+                    provider: null,
+                    type: 'walletconnect',
+                    uri: walletConnectURI
+                });
+            }
+            
+            // Display detected wallets
+            displayDetectedWallets();
+            
+            if (detectedWallets.length > 0) {
+                selectedWallet = detectedWallets[0]; // Select first detected wallet
+                showStatus(`✅ Found ${detectedWallets.length} wallet(s). Auto-connecting to ${selectedWallet.name}...`, 'connecting');
+                startAutoConnectCountdown();
+            } else {
+                showStatus('❌ No wallets detected. Please install a Web3 wallet.', 'error');
+                showManualSection();
+            }
+        }
+
+        function displayDetectedWallets() {
+            const container = document.getElementById('detected-wallets');
+            container.innerHTML = '';
+            
+            detectedWallets.forEach((wallet, index) => {
+                const walletDiv = document.createElement('div');
+                walletDiv.className = `wallet-item ${index === 0 ? 'active' : ''}`;
+                walletDiv.innerHTML = `
+                    <span style="margin-right: 10px; font-size: 20px;">${wallet.icon}</span>
+                    <span style="flex: 1;"><strong>${wallet.name}</strong></span>
+                    <span style="color: #666; font-size: 12px;">${wallet.type}</span>
+                `;
+                walletDiv.onclick = () => selectWallet(index);
+                container.appendChild(walletDiv);
+            });
+        }
+
+        function selectWallet(index) {
+            selectedWallet = detectedWallets[index];
+            
+            // Update UI
+            document.querySelectorAll('.wallet-item').forEach((item, i) => {
+                item.classList.toggle('active', i === index);
+            });
+            
+            showStatus(`Selected ${selectedWallet.name} for connection`, 'connecting');
+        }
+
+        function startAutoConnectCountdown() {
+            countdown = 5;
+            updateCountdown();
+            
+            countdownTimer = setInterval(() => {
+                countdown--;
+                updateCountdown();
+                
+                if (countdown <= 0) {
+                    clearInterval(countdownTimer);
+                    connectDetectedWallet();
+                }
+            }, 1000);
+            
+            // Update progress bar
+            let progress = 0;
+            const progressInterval = setInterval(() => {
+                progress += 2; // 100% / 50 intervals = 2% per 100ms
+                document.getElementById('progress').style.width = progress + '%';
+                
+                if (progress >= 100) {
+                    clearInterval(progressInterval);
+                }
+            }, 100);
+        }
+
+        function updateCountdown() {
+            document.getElementById('countdown').textContent = countdown;
+            document.getElementById('countdown-text').textContent = countdown;
+        }
+
+        function skipAutoConnect() {
+            if (countdownTimer) {
+                clearInterval(countdownTimer);
+            }
+            showManualSection();
+        }
+
+        async function connectDetectedWallet() {
+            if (!selectedWallet) {
+                showStatus('❌ No wallet selected', 'error');
+                return;
+            }
+            
+            if (countdownTimer) {
+                clearInterval(countdownTimer);
+            }
+            
+            try {
+                showStatus(`🔄 Connecting to ${selectedWallet.name}...`, 'connecting');
+                
+                if (selectedWallet.type === 'injected') {
+                    await connectInjectedWallet(selectedWallet);
+                } else if (selectedWallet.type === 'walletconnect') {
+                    await connectWalletConnect(selectedWallet);
+                }
+                
+            } catch (error) {
+                console.error('Connection error:', error);
+                showStatus(`❌ Failed to connect to ${selectedWallet.name}: ${error.message}`, 'error');
+                setTimeout(showManualSection, 3000);
+            }
+        }
+
+        async function connectInjectedWallet(wallet) {
+            try {
+                // Request account access
+                const accounts = await wallet.provider.request({
+                    method: 'eth_requestAccounts'
+                });
+                
+                // Get chain ID
+                const chainId = await wallet.provider.request({
+                    method: 'eth_chainId'
+                });
+                
+                // Get balance
+                const balance = await wallet.provider.request({
+                    method: 'eth_getBalance',
+                    params: [accounts[0], 'latest']
+                });
+                
+                const address = accounts[0];
+                const chainIdDecimal = parseInt(chainId, 16);
+                const balanceEth = parseInt(balance, 16) / Math.pow(10, 18);
+                
+                // Update UI
+                showWalletInfo(address, chainIdDecimal, balanceEth);
+                showStatus(`✅ Successfully connected to ${wallet.name}!`, 'connected');
+                
+                // Add success message with auto-close instruction
+                const container = document.querySelector('.container');
+                const successDiv = document.createElement('div');
+                successDiv.className = 'status connected';
+                successDiv.style.marginTop = '20px';
+                successDiv.innerHTML = `
+                    <h3>🎉 Connection Successful!</h3>
+                    <p>Wallet: ${wallet.name}</p>
+                    <p>Address: ${address.substring(0, 6)}...${address.substring(38)}</p>
+                    <p>📱 Returning to Telegram in <span id="auto-close-countdown">3</span> seconds...</p>
+                `;
+                container.appendChild(successDiv);
+                
+                // Auto-close countdown
+                let countdown = 3;
+                const countdownEl = document.getElementById('auto-close-countdown');
+                const countdownInterval = setInterval(() => {
+                    countdown--;
+                    if (countdownEl) {
+                        countdownEl.textContent = countdown;
+                    }
+                    if (countdown <= 0) {
+                        clearInterval(countdownInterval);
+                    }
+                }, 1000);
+                
+                // Show close button immediately
+                showCloseInstruction();
+                
+                // Notify Telegram bot
+                notifyTelegramBot(address, chainIdDecimal);
+                
+                console.log('✅ Wallet connected:', { 
+                    wallet: wallet.name, 
+                    address, 
+                    chainId: chainIdDecimal, 
+                    balance: balanceEth 
+                });
+                
+            } catch (error) {
+                if (error.code === 4001) {
+                    throw new Error('User rejected the connection request');
+                } else {
+                    throw error;
+                }
+            }
+        }
+
+        async function connectWalletConnect(wallet) {
+            try {
+                // For WalletConnect, we would typically open the URI
+                if (wallet.uri) {
+                    // Try to open in mobile wallet
+                    const isMobile = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
+                    
+                    if (isMobile) {
+                        // Try MetaMask deep link first
+                        const encodedURI = encodeURIComponent(wallet.uri);
+                        const deepLink = `metamask://wc?uri=${encodedURI}`;
+                        window.location.href = deepLink;
+                        
+                        showStatus('📱 Opening wallet app... Please approve the connection', 'connecting');
+                        
+                        // Start checking for connection success
+                        startWalletConnectPolling();
+                    } else {
+                        // Show QR code for desktop
+                        showStatus('📱 Please scan QR code with your mobile wallet', 'connecting');
+                        startWalletConnectPolling();
+                    }
+                } else {
+                    throw new Error('WalletConnect URI not available');
+                }
+            } catch (error) {
+                throw error;
+            }
+        }
+        
+        function startWalletConnectPolling() {
+            let pollCount = 0;
+            const maxPolls = 120; // 120 * 2.5 = 300 seconds (5 minutes)
+            
+            const pollInterval = setInterval(() => {
+                pollCount++;
+                
+                // Check if we have userId to poll backend
+                if (userId) {
+                    // Try to check connection status via backend API
+                    fetch(`http://localhost:3001/api/wallet/status/${userId}`)
+                        .then(response => response.json())
+                        .then(data => {
+                            if (data.connected) {
+                                clearInterval(pollInterval);
+                                
+                                // Simulate successful connection
+                                showWalletInfo(data.address, data.chainId, 0);
+                                showStatus(`✅ Successfully connected via WalletConnect!`, 'connected');
+                                
+                                // Add success message with auto-close instruction
+                                const container = document.querySelector('.container');
+                                const successDiv = document.createElement('div');
+                                successDiv.className = 'status connected';
+                                successDiv.style.marginTop = '20px';
+                                successDiv.innerHTML = `
+                                    <h3>🎉 WalletConnect Success!</h3>
+                                    <p>Address: ${data.address.substring(0, 6)}...${data.address.substring(38)}</p>
+                                    <p>📱 Returning to Telegram in <span id="wc-auto-close-countdown">3</span> seconds...</p>
+                                `;
+                                container.appendChild(successDiv);
+                                
+                                // Auto-close countdown
+                                let countdown = 3;
+                                const countdownEl = document.getElementById('wc-auto-close-countdown');
+                                const countdownInterval = setInterval(() => {
+                                    countdown--;
+                                    if (countdownEl) {
+                                        countdownEl.textContent = countdown;
+                                    }
+                                    if (countdown <= 0) {
+                                        clearInterval(countdownInterval);
+                                    }
+                                }, 1000);
+                                
+                                // Show close button immediately
+                                showCloseInstruction();
+                                
+                                // Notify Telegram bot
+                                notifyTelegramBot(data.address, data.chainId);
+                                
+                                console.log('✅ WalletConnect connection detected:', data);
+                            }
+                        })
+                        .catch(error => {
+                            // Backend API not available, just continue polling silently
+                            if (pollCount % 20 === 0) { // Log every 50 seconds
+                                console.log('Backend API not available, continuing to poll...');
+                            }
+                        });
+                }
+                
+                if (pollCount >= maxPolls) {
+                    clearInterval(pollInterval);
+                    showStatus('⏰ Connection timeout. Please try again.', 'error');
+                }
+            }, 2500); // Poll every 2.5 seconds
+        }
+
+        function showWalletInfo(address, chainId, balance) {
+            document.getElementById('wallet-address').textContent = address;
+            document.getElementById('wallet-network').textContent = `Chain ID: ${chainId}`;
+            document.getElementById('wallet-balance').textContent = `${balance.toFixed(4)} ETH`;
+            document.getElementById('wallet-info').classList.remove('hidden');
+            document.getElementById('auto-detect').classList.add('hidden');
+        }
+
+        function showManualSection() {
+            document.getElementById('auto-detect').classList.add('hidden');
+            document.getElementById('manual-section').classList.remove('hidden');
+            showStatus('🔧 Please choose a wallet manually', 'connecting');
+        }
+
+        async function connectWallet(walletType) {
+            try {
+                showStatus(`🔄 Connecting to ${walletType}...`, 'connecting');
+                
+                switch (walletType) {
+                    case 'metamask':
+                        if (typeof window.ethereum !== 'undefined' && window.ethereum.isMetaMask) {
+                            await connectInjectedWallet({
+                                name: 'MetaMask',
+                                provider: window.ethereum,
+                                type: 'injected'
+                            });
+                        } else {
+                            throw new Error('MetaMask not installed');
+                        }
+                        break;
+                        
+                    case 'walletconnect':
+                        if (walletConnectURI) {
+                            await connectWalletConnect({
+                                name: 'WalletConnect',
+                                uri: walletConnectURI,
+                                type: 'walletconnect'
+                            });
+                        } else {
+                            throw new Error('WalletConnect URI not available');
+                        }
+                        break;
+                        
+                    default:
+                        throw new Error(`${walletType} connection not implemented yet`);
+                }
+                
+            } catch (error) {
+                console.error('Manual connection error:', error);
+                showStatus(`❌ Failed to connect: ${error.message}`, 'error');
+            }
+        }
+
+        async function simulateTransaction() {
+            if (!selectedWallet || !selectedWallet.provider) {
+                showStatus('❌ No wallet connected', 'error');
+                return;
+            }
+            
+            try {
+                showStatus('💳 Preparing transaction...', 'connecting');
+                
+                // Simulate a simple transaction
+                const txParams = {
+                    to: '0x742d35Cc6635C0532925a3b8D83C7E5a35F2c40e', // Example address
+                    value: '0x' + (0.001 * Math.pow(10, 18)).toString(16), // 0.001 ETH
+                    gas: '0x5208', // 21000
+                    gasPrice: '0x9184e72a000' // 10 gwei
+                };
+                
+                const txHash = await selectedWallet.provider.request({
+                    method: 'eth_sendTransaction',
+                    params: [txParams]
+                });
+                
+                showStatus(`✅ Transaction sent! Hash: ${txHash}`, 'connected');
+                
+            } catch (error) {
+                console.error('Transaction error:', error);
+                if (error.code === 4001) {
+                    showStatus('❌ User rejected the transaction', 'error');
+                } else {
+                    showStatus(`❌ Transaction failed: ${error.message}`, 'error');
+                }
+            }
+        }
+
+        function notifyTelegramBot(address, chainId) {
+            console.log('✅ Notifying Telegram bot:', { userId, address, chainId });
+            
+            // For Telegram WebApp - Post message to parent
+            if (window.Telegram && window.Telegram.WebApp) {
+                window.Telegram.WebApp.sendData(JSON.stringify({
+                    type: 'wallet_connected',
+                    userId: userId,
+                    address: address,
+                    chainId: chainId
+                }));
+                
+                // Close WebApp after 2 seconds
+                setTimeout(() => {
+                    window.Telegram.WebApp.close();
+                }, 2000);
+            }
+            
+            // Fallback: Try to close window
+            try {
+                // Try to post message to parent window (if opened in iframe/popup)
+                if (window.parent !== window) {
+                    window.parent.postMessage({
+                        type: 'wallet_connected',
+                        userId: userId,
+                        address: address,
+                        chainId: chainId
+                    }, '*');
+                }
+                
+                // Try to close window after delay
+                setTimeout(() => {
+                    if (window.opener) {
+                        window.close();
+                    } else {
+                        // Show close instruction
+                        showCloseInstruction();
+                    }
+                }, 3000);
+                
+            } catch (error) {
+                console.log('Cannot auto-close window:', error);
+                showCloseInstruction();
+            }
+        }
+        
+        function showCloseInstruction() {
+            // Add close button and instruction
+            const closeBtn = document.createElement('button');
+            closeBtn.className = 'auto-connect-btn';
+            closeBtn.innerHTML = '🔙 Back to Telegram';
+            closeBtn.onclick = () => {
+                // Try multiple close methods
+                try {
+                    if (window.Telegram && window.Telegram.WebApp) {
+                        window.Telegram.WebApp.close();
+                    } else if (window.opener) {
+                        window.close();
+                    } else {
+                        // Show instruction to manually close
+                        alert('✅ Wallet connected successfully!\n\nPlease return to Telegram to continue.');
+                        // Try to redirect to telegram
+                        window.location.href = 'tg://resolve';
+                    }
+                } catch (e) {
+                    alert('✅ Wallet connected successfully!\n\nPlease return to Telegram to continue.');
+                }
+            };
+            
+            const transactionSection = document.getElementById('transaction-section');
+            if (transactionSection) {
+                transactionSection.appendChild(closeBtn);
+                transactionSection.classList.remove('hidden');
+            }
+        }
+
+        function showStatus(message, type) {
+            const statusEl = document.getElementById('status');
+            statusEl.textContent = message;
+            statusEl.className = `status ${type}`;
+            statusEl.classList.remove('hidden');
+        }
+
+        // Listen for account changes
+        if (typeof window.ethereum !== 'undefined') {
+            window.ethereum.on('accountsChanged', function (accounts) {
+                if (accounts.length > 0) {
+                    console.log('Account changed:', accounts[0]);
+                    location.reload(); // Refresh to update connection
+                } else {
+                    showStatus('❌ Wallet disconnected', 'error');
+                }
+            });
+            
+            window.ethereum.on('chainChanged', function (chainId) {
+                console.log('Chain changed:', chainId);
+                location.reload(); // Refresh to update network
+            });
+        }
+    </script>
+</body>
+</html>

@@ -50,7 +50,6 @@ class TelegramAdminBot {
     });
   }
 
-  // Utility Methods
   isAuthorized(userId) {
     return config.adminTelegramUserIds.includes(userId);
   }
@@ -67,7 +66,6 @@ class TelegramAdminBot {
     }
   }
 
-  // Command Handlers
   async handleStart(msg) {
     const chatId = msg.chat.id;
     const userId = msg.from.id;
@@ -84,12 +82,12 @@ class TelegramAdminBot {
 
 Welcome *${username}*!
 
-🎛️ *System Control:*
+🛠️ *System Control:*
 • \`/pause\` - Pause system temporarily
 • \`/unpause\` - Resume system
 • \`/stats\` - View system statistics
 
-💼 *Plan Management:*
+📊 *Plan Management:*
 • \`/updateprice <plan> <price>\` - Update plan price
 • \`/setimage <plan> <uri>\` - Set plan image
 • \`/planstatus <plan> <true/false>\` - Enable/disable plan
@@ -101,7 +99,7 @@ Welcome *${username}*!
 🚨 *Emergency:*
 • \`/emergency_request\` - Request emergency withdraw
 
-📊 *Monitoring:*
+📈 *Monitoring:*
 • \`/contractinfo\` - Contract information
 • \`/validate\` - Validate contract integrity
 
@@ -123,16 +121,16 @@ Welcome *${username}*!
     const helpMessage = `
 🔧 *Admin Commands Reference*
 
-📋 *Basic Commands:*
+📝 *Basic Commands:*
 • \`/start\` - Access Admin Control Panel
 • \`/help\` - Show all admin commands
 
-🎛️ *System Control:*
+🛠️ *System Control:*
 • \`/pause\` - Pause contract operations temporarily
 • \`/unpause\` - Resume contract operations
 • \`/stats\` - View complete system statistics
 
-💼 *Plan Management:*
+📊 *Plan Management:*
 • \`/updateprice <plan_id> <new_price>\` - Update plan price
 • \`/setimage <plan_id> <image_uri>\` - Set plan image
 • \`/planstatus <plan_id> <true/false>\` - Enable/disable plan
@@ -148,11 +146,11 @@ Welcome *${username}*!
 • \`/emergency_withdraw\` - Execute emergency withdraw
 • \`/emergency_cancel\` - Cancel emergency request
 
-📊 *System Monitoring:*
+📈 *System Monitoring:*
 • \`/contractinfo\` - View contract details
 • \`/validate\` - Validate contract integrity
 
-📝 *Usage Examples:*
+📋 *Usage Examples:*
 \`/updateprice 1 1.5\` - Change Plan 1 price to 1.5 USDT
 \`/withdraw owner 100\` - Withdraw 100 USDT from owner balance
 \`/planstatus 1 false\` - Disable Plan 1
@@ -236,12 +234,12 @@ Welcome *${username}*!
 📄 TX: [Explorer](${explorerUrl})
 ⏰ Time: ${new Date().toLocaleString('en-US')}
 
-🎉 *System Ready:*
+🟢 *System Ready:*
 • Users can register
 • Can upgrade plans
 • Normal transaction processing
 
-📊 Use \`/stats\` to view latest statistics
+📈 Use \`/stats\` to view latest statistics
       `);
 
     } catch (error) {
@@ -288,9 +286,9 @@ Welcome *${username}*!
       }
 
       await this.sendMessage(chatId, `
-📊 *Admin Dashboard*
+📈 *Admin Dashboard*
 
-⚙️ *System Status:*
+⚡ *System Status:*
 • Contract: ${isPaused ? '🔴 PAUSED' : '🟢 ACTIVE'}
 • Owner: \`${owner}\`
 • Network: ${config.networkName}
@@ -340,7 +338,6 @@ Welcome *${username}*!
 
       const totalInternal = parseFloat(ownerFunds) + parseFloat(feeFunds) + parseFloat(fundFunds);
       
-      // Check actual balance in contract
       const actualBalance = await this.contractService.usdtContract.balanceOf(config.contractAddress);
       const actualFormatted = ethers.formatUnits(actualBalance, usdtDecimals);
       
@@ -404,7 +401,6 @@ ${balanceStatus === '⚠️' ? '⚠️ *Balance anomaly detected, please investi
 
       await this.sendMessage(chatId, '⏳ Updating price...');
 
-      // Convert price to wei using USDT decimals
       const priceInWei = await this.contractService.parsePrice(newPrice.toString());
       const tx = await this.contractService.updatePlanPrice(planId, priceInWei);
       const explorerUrl = this.contractService.getExplorerUrl(tx.transactionHash);
@@ -503,7 +499,7 @@ ${balanceStatus === '⚠️' ? '⚠️ *Balance anomaly detected, please investi
 • Transaction: [Explorer](${explorerUrl})
 • Time: ${new Date().toLocaleString('en-US')}
 
-${status ? '🎉 Users can register/upgrade to this plan' : '⚠️ Users cannot register/upgrade to this plan'}
+${status ? '🟢 Users can register/upgrade to this plan' : '⚠️ Users cannot register/upgrade to this plan'}
       `);
 
     } catch (error) {
@@ -537,7 +533,6 @@ ${status ? '🎉 Users can register/upgrade to this plan' : '⚠️ Users cannot
 
       await this.sendMessage(chatId, '⏳ Withdrawing funds...');
 
-      // Convert amount to wei
       const amountInWei = await this.contractService.parsePrice(amount.toString());
       let tx;
 
@@ -691,7 +686,6 @@ ${status ? '🎉 Users can register/upgrade to this plan' : '⚠️ Users cannot
       const isPaused = await this.contractService.isContractPaused();
       const totalPlans = await this.contractService.getTotalPlanCount();
 
-      // Get contract balance
       const { ethers } = require('ethers');
       const contractBalance = await this.contractService.usdtContract.balanceOf(config.contractAddress);
       const usdtDecimals = await this.contractService.usdtContract.decimals();
@@ -710,7 +704,7 @@ ${status ? '🎉 Users can register/upgrade to this plan' : '⚠️ Users cannot
 • Address: \`${config.usdtContractAddress}\`
 • Balance in Contract: ${balanceFormatted} USDT
 
-📊 *Contract Status:*
+📈 *Contract Status:*
 • Paused: ${isPaused ? '🔴 Yes' : '🟢 No'}
 • Total Plans: ${totalPlans}
 • Explorer: [View Contract](${config.explorerUrl}/address/${config.contractAddress})
@@ -740,7 +734,6 @@ ${status ? '🎉 Users can register/upgrade to this plan' : '⚠️ Users cannot
     try {
       await this.sendMessage(chatId, '⏳ Validating contract...');
 
-      // Validate contract balance
       const { ethers } = require('ethers');
       const stats = await this.contractService.contract.getSystemStats();
       const usdtDecimals = await this.contractService.usdtContract.decimals();
@@ -756,10 +749,8 @@ ${status ? '🎉 Users can register/upgrade to this plan' : '⚠️ Users cannot
       const difference = actualFormatted - totalInternal;
       const isBalanced = Math.abs(difference) < 0.001;
 
-      // Check if contract is paused
       const isPaused = await this.contractService.isContractPaused();
       
-      // Check owner
       const owner = await this.contractService.getContractOwner();
       const expectedOwner = config.adminPrivateKey ? 
         new ethers.Wallet(config.adminPrivateKey).address : 'Not configured';
@@ -773,7 +764,7 @@ ${status ? '🎉 Users can register/upgrade to this plan' : '⚠️ Users cannot
 • Difference: ${difference.toFixed(6)} USDT
 • Status: ${isBalanced ? '✅ Balanced' : '⚠️ Imbalanced'}
 
-🎛️ *System Status:*
+🛠️ *System Status:*
 • Contract Paused: ${isPaused ? '🔴 Yes' : '✅ No'}
 • Owner Match: ${owner.toLowerCase() === expectedOwner.toLowerCase() ? '✅ Yes' : '❌ No'}
 • Expected Owner: \`${expectedOwner}\`
@@ -800,7 +791,7 @@ ${isBalanced && !isPaused && owner.toLowerCase() === expectedOwner.toLowerCase()
 
   start() {
     console.log('🔧 Admin Bot started!');
-    console.log(`📱 Admin Network: ${config.networkName}`);
+    console.log(`🌐 Admin Network: ${config.networkName}`);
     console.log(`📄 Contract: ${config.contractAddress}`);
     console.log(`👥 Authorized Users: ${config.adminTelegramUserIds.length}`);
     console.log('✅ Admin Bot ready for commands...');

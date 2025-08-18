@@ -1,7 +1,7 @@
 {
   "name": "telegram-membership-bot",
-  "version": "1.0.0",
-  "description": "Telegram bot for managing crypto membership NFT on BSC Testnet",
+  "version": "2.0.0",
+  "description": "Telegram bot for managing crypto membership NFT with WalletConnect integration",
   "main": "index.js",
   "scripts": {
     "start": "node index.js",
@@ -15,17 +15,27 @@
     "nft",
     "membership",
     "bsc",
-    "blockchain"
+    "blockchain",
+    "walletconnect"
   ],
   "author": "",
   "license": "MIT",
   "dependencies": {
     "dotenv": "^16.3.1",
     "ethers": "^6.8.1",
-    "node-telegram-bot-api": "^0.64.0"
+    "node-telegram-bot-api": "^0.64.0",
+    "@walletconnect/sign-client": "^2.10.0",
+    "@walletconnect/utils": "^2.10.0",
+    "@walletconnect/modal": "^2.6.2",
+    "qrcode": "^1.5.3",
+    "uuid": "^9.0.1",
+    "axios": "^1.6.0",
+    "express": "^4.18.2",
+    "cors": "^2.8.5",
+    "crypto": "^1.0.1",
+    "events": "^3.3.0"
   },
   "engines": {
     "node": ">=16.0.0"
   }
 }
-

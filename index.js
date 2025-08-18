@@ -35,7 +35,7 @@ async function startBots() {
     }
     
     if (bots.length === 0) {
-      console.log('⚠️  No bots enabled. Check your .env configuration:');
+      console.log('⚠️ No bots enabled. Check your .env configuration:');
       console.log('   ENABLE_USER_BOT=true');
       console.log('   ENABLE_ADMIN_BOT=true');
       process.exit(1);
@@ -47,7 +47,7 @@ async function startBots() {
       console.log(`   ✅ ${bot.name} (${maskedToken})`);
     });
     
-    console.log(`\n📱 Network: ${config.networkName}`);
+    console.log(`\n🌐 Network: ${config.networkName}`);
     console.log(`📄 Contract: ${config.contractAddress}`);
     console.log(`👥 Admin Users: ${config.adminTelegramUserIds.length}`);
     console.log('\n🚀 All bots are ready and listening for commands!\n');

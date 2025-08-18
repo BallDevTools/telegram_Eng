@@ -17,7 +17,7 @@ const config = {
   contractAddress: process.env.CONTRACT_ADDRESS,
   usdtContractAddress: process.env.USDT_CONTRACT_ADDRESS || '0x337610d27c682E347C9cD60BD4b3b107C9d34dDd',
   
-  // Admin Configuration
+  // Admin Configuration (for admin functions only)
   adminPrivateKey: process.env.ADMIN_WALLET_PRIVATE_KEY,
   adminTelegramUserIds: process.env.ADMIN_TELEGRAM_USER_IDS ? 
     process.env.ADMIN_TELEGRAM_USER_IDS.split(',').map(id => parseInt(id.trim())) : [],
@@ -29,6 +29,14 @@ const config = {
   // Gas Configuration
   gasLimit: parseInt(process.env.GAS_LIMIT) || 1000000,
   gasPrice: process.env.GAS_PRICE || '20000000000',
+
+  // WalletConnect Configuration
+  walletConnectBridge: process.env.WALLETCONNECT_BRIDGE || 'https://bridge.walletconnect.org',
+  sessionTimeout: parseInt(process.env.SESSION_TIMEOUT) || 1800000, // 30 minutes
+  
+  // Security Configuration
+  maxTransactionRetries: parseInt(process.env.MAX_TX_RETRIES) || 3,
+  transactionTimeout: parseInt(process.env.TX_TIMEOUT) || 300000, // 5 minutes
 };
 
 // Validation
@@ -46,6 +54,16 @@ if (!config.contractAddress) {
 
 if (config.enableAdminBot && config.adminTelegramUserIds.length === 0) {
   console.warn('Warning: No admin user IDs configured for admin bot');
+}
+
+// Security warnings
+if (config.enableUserBot) {
+  console.log('🔒 Security Mode: WalletConnect (Private keys never stored in bot)');
+}
+
+if (config.adminPrivateKey && config.adminPrivateKey !== 'test_private_key') {
+  console.log('🔧 Admin functions enabled with private key');
+  console.warn('⚠️ Keep admin private key secure!');
 }
 
 module.exports = config;

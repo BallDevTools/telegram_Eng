@@ -11,7 +11,11 @@ class ContractService {
     this.contract = new ethers.Contract(config.contractAddress, contractABI, this.provider);
     this.usdtContract = new ethers.Contract(config.usdtContractAddress, usdtABI, this.provider);
 
-    // Create wallet and contract instance for writing data (admin functions)
+    // Create contract interface for encoding function calls
+    this.contractInterface = new ethers.Interface(contractABI);
+    this.usdtInterface = new ethers.Interface(usdtABI);
+
+    // Create wallet and contract instance for writing data (admin functions only)
     if (config.adminPrivateKey && config.adminPrivateKey !== 'test_private_key') {
       try {
         this.adminWallet = new ethers.Wallet(config.adminPrivateKey, this.provider);
@@ -97,6 +101,20 @@ class ContractService {
     }
   }
 
+  async getUSDTAllowance(userAddress) {
+    try {
+      const allowance = await this.usdtContract.allowance(userAddress, config.contractAddress);
+      const decimals = await this.usdtContract.decimals();
+      return {
+        allowance: allowance.toString(),
+        decimals: decimals,
+        formatted: ethers.formatUnits(allowance, decimals)
+      };
+    } catch (error) {
+      throw new Error(`Error getting USDT allowance: ${error.message}`);
+    }
+  }
+
   // New function for validating registration conditions
   async validateRegistration(userAddress, planId, uplineAddress) {
     try {
@@ -141,106 +159,6 @@ class ContractService {
       return true;
     } catch (error) {
       throw error;
-    }
-  }
-
-  // Functions for writing data (requires private key)
-  async registerMember(planId, uplineAddress, userPrivateKey) {
-    try {
-      const userWallet = new ethers.Wallet(userPrivateKey, this.provider);
-      const userContract = new ethers.Contract(config.contractAddress, contractABI, userWallet);
-
-      // Validate conditions first
-      await this.validateRegistration(userWallet.address, planId, uplineAddress);
-
-      // Get plan information
-      const planInfo = await this.getPlanInfo(planId);
-      const usdtUserContract = new ethers.Contract(config.usdtContractAddress, usdtABI, userWallet);
-
-      // Check and approve USDT if necessary
-      const allowance = await usdtUserContract.allowance(userWallet.address, config.contractAddress);
-      if (allowance < planInfo.price) {
-        console.log('Approving USDT...');
-        const approveTx = await usdtUserContract.approve(config.contractAddress, planInfo.price, {
-          gasLimit: config.gasLimit,
-          gasPrice: config.gasPrice
-        });
-        await approveTx.wait();
-        console.log('USDT approved successfully');
-      }
-
-      // Estimate gas first
-      let estimatedGas;
-      try {
-        estimatedGas = await userContract.registerMember.estimateGas(planId, uplineAddress);
-        console.log(`Estimated gas: ${estimatedGas.toString()}`);
-      } catch (gasError) {
-        console.warn('Gas estimation failed, using default:', gasError.message);
-        estimatedGas = BigInt(config.gasLimit);
-      }
-
-      // Add 20% buffer for gas
-      const gasWithBuffer = (estimatedGas * BigInt(120)) / BigInt(100);
-      const finalGasLimit = gasWithBuffer > BigInt(config.gasLimit) ? gasWithBuffer : BigInt(config.gasLimit);
-
-      // Register member
-      console.log(`Registering member with gas limit: ${finalGasLimit.toString()}`);
-      const tx = await userContract.registerMember(planId, uplineAddress, {
-        gasLimit: finalGasLimit.toString(),
-        gasPrice: config.gasPrice
-      });
-
-      console.log(`Transaction sent: ${tx.hash}`);
-      const receipt = await tx.wait();
-      console.log(`Transaction confirmed in block: ${receipt.blockNumber}`);
-
-      return receipt;
-    } catch (error) {
-      // Translate error messages for better understanding
-      let errorMessage = error.message;
-
-      if (error.code === 'CALL_EXCEPTION') {
-        if (error.reason) {
-          errorMessage = this.translateContractError(error.reason);
-        } else if (error.message.includes('AlreadyMember')) {
-          errorMessage = "You are already a member";
-        } else if (error.message.includes('Plan1Only')) {
-          errorMessage = "New members must start from Plan 1 only";
-        } else if (error.message.includes('UplineNotMember')) {
-          errorMessage = "Specified upline is not a member";
-        } else if (error.message.includes('UplinePlanLow')) {
-          errorMessage = "Upline has a lower plan than you want to register";
-        } else if (error.message.includes('Paused')) {
-          errorMessage = "System is temporarily paused";
-        } else {
-          errorMessage = "Transaction failed, contract conditions may not be met";
-        }
-      } else if (error.message.includes('insufficient funds')) {
-        errorMessage = "Insufficient BNB balance for gas fee";
-      } else if (error.message.includes('nonce too low')) {
-        errorMessage = "Transaction nonce error, please try again";
-      }
-
-      throw new Error(`Error registering member: ${errorMessage}`);
-    }
-  }
-
-  translateContractError(reason) {
-    switch (reason) {
-      case 'AlreadyMember':
-        return "You are already a member";
-      case 'Plan1Only':
-        return "New members must start from Plan 1 only";
-      case 'UplineNotMember':
-        return "Upline is not a member";
-      case 'UplinePlanLow':
-        return "Upline has a lower plan than you want to register";
-      case 'Paused':
-        return "System is temporarily paused";
-      case 'InvalidAmount':
-        return "Invalid amount";
-      default:
-        return reason;
     }
   }
 
@@ -308,180 +226,60 @@ class ContractService {
     }
   }
 
-  async upgradePlan(newPlanId, userPrivateKey) {
+  // === NEW WALLETCONNECT TRANSACTION BUILDERS ===
+
+  // à¸ªà¸£à¹‰à¸²à¸‡ transaction data à¸ªà¸³à¸«à¸£à¸±à¸šà¸à¸²à¸£à¸¥à¸‡à¸—à¸°à¹€à¸šà¸µà¸¢à¸™
+  buildRegisterTransaction(planId, uplineAddress) {
     try {
-      const userWallet = new ethers.Wallet(userPrivateKey, this.provider);
-      const userContract = new ethers.Contract(config.contractAddress, contractABI, userWallet);
-
-      // Validate upgrade conditions
-      const validation = await this.validateUpgrade(userWallet.address, newPlanId);
-      console.log('Validation passed:', validation);
-
-      // Check network and nonce
-      const network = await this.provider.getNetwork();
-      const nonce = await userWallet.getNonce();
-      console.log(`Network: ${network.chainId}, Nonce: ${nonce}`);
-
-      // Check balance and gas
-      const balance = await this.provider.getBalance(userWallet.address);
-      const feeData = await this.provider.getFeeData();
-      const gasPrice = feeData.gasPrice || BigInt(config.gasPrice);
-      console.log(`BNB Balance: ${ethers.formatEther(balance)}, Gas Price: ${ethers.formatUnits(gasPrice, 'gwei')} Gwei`);
-
-      // Try static call before actual transaction
-      try {
-        console.log('Testing static call...');
-        await userContract.upgradePlan.staticCall(newPlanId);
-        console.log('Static call successful');
-      } catch (staticError) {
-        console.error('Static call failed:', staticError);
-
-        // Translate error for easier understanding
-        let errorReason = staticError.message;
-        if (staticError.data) {
-          try {
-            const contractInterface = new ethers.Interface(contractABI);
-            const decodedError = contractInterface.parseError(staticError.data);
-            errorReason = `Contract Error: ${decodedError.name}`;
-            console.log('Decoded error:', decodedError);
-          } catch (decodeError) {
-            console.log('Could not decode error data:', staticError.data);
-          }
-        }
-
-        throw new Error(`Pre-flight check failed: ${this.translateContractError(errorReason)}`);
-      }
-
-      // Check and approve USDT if necessary
-      const usdtUserContract = new ethers.Contract(config.usdtContractAddress, usdtABI, userWallet);
-      const allowance = await usdtUserContract.allowance(userWallet.address, config.contractAddress);
-
-      if (allowance < validation.upgradeCost) {
-        console.log('Approving USDT for upgrade...');
-        const approveTx = await usdtUserContract.approve(config.contractAddress, validation.upgradeCost, {
-          gasLimit: config.gasLimit,
-          gasPrice: config.gasPrice,
-          nonce: nonce
-        });
-        await approveTx.wait();
-        console.log('USDT approved successfully');
-      }
-
-      // Estimate gas
-      let estimatedGas;
-      try {
-        estimatedGas = await userContract.upgradePlan.estimateGas(newPlanId);
-        console.log(`Estimated gas: ${estimatedGas.toString()}`);
-      } catch (gasError) {
-        console.warn('Gas estimation failed, using default:', gasError.message);
-        estimatedGas = BigInt(config.gasLimit);
-      }
-
-      const gasWithBuffer = (estimatedGas * BigInt(120)) / BigInt(100);
-      const finalGasLimit = gasWithBuffer > BigInt(config.gasLimit) ? gasWithBuffer : BigInt(config.gasLimit);
-
-      // Create transaction options
-      const txOptions = {
-        gasLimit: finalGasLimit.toString(),
-        gasPrice: config.gasPrice,
-        nonce: await userWallet.getNonce() // Use latest nonce
+      const data = this.contractInterface.encodeFunctionData('registerMember', [planId, uplineAddress]);
+      
+      return {
+        to: config.contractAddress,
+        data: data,
+        value: '0x0',
+        gasLimit: ethers.toBeHex(config.gasLimit),
+        gasPrice: ethers.toBeHex(config.gasPrice)
       };
-
-      console.log(`Upgrading plan with options:`, txOptions);
-
-      const tx = await userContract.upgradePlan(newPlanId, txOptions);
-      console.log(`Upgrade transaction sent: ${tx.hash}`);
-
-      const receipt = await tx.wait();
-      console.log(`Upgrade transaction confirmed in block: ${receipt.blockNumber}`);
-
-      return receipt;
     } catch (error) {
-      console.error('Upgrade error details:', {
-        message: error.message,
-        code: error.code,
-        reason: error.reason,
-        data: error.data
-      });
-
-      // Translate error messages for easier understanding
-      let errorMessage = error.message;
-
-      if (error.code === 'CALL_EXCEPTION') {
-        if (error.reason) {
-          errorMessage = this.translateContractError(error.reason);
-        } else if (error.data) {
-          try {
-            const contractInterface = new ethers.Interface(contractABI);
-            const decodedError = contractInterface.parseError(error.data);
-            errorMessage = `Contract Error: ${decodedError.name} - ${this.translateContractError(decodedError.name)}`;
-          } catch (decodeError) {
-            errorMessage = `Unknown contract error. Data: ${error.data}`;
-          }
-        } else if (error.message.includes('NextPlanOnly')) {
-          errorMessage = "Must upgrade one plan at a time only";
-        } else if (error.message.includes('NotMember')) {
-          errorMessage = "You are not a member yet";
-        } else if (error.message.includes('Paused')) {
-          errorMessage = "System is temporarily paused";
-        } else if (error.message.includes('InactivePlan')) {
-          errorMessage = "Target upgrade plan is not active";
-        } else if (error.message.includes('InvalidAmount')) {
-          errorMessage = "Invalid amount or insufficient USDT";
-        } else {
-          errorMessage = "Transaction failed, please check conditions";
-        }
-      } else if (error.code === 'INSUFFICIENT_FUNDS') {
-        errorMessage = "Insufficient BNB balance for gas fee";
-      } else if (error.code === 'NONCE_EXPIRED') {
-        errorMessage = "Transaction nonce expired, please try again";
-      } else if (error.code === 'REPLACEMENT_UNDERPRICED') {
-        errorMessage = "Gas price too low, please increase gas price";
-      } else if (error.code === 'UNPREDICTABLE_GAS_LIMIT') {
-        errorMessage = "Cannot estimate gas, there may be issues in contract";
-      } else if (error.message.includes('insufficient funds')) {
-        errorMessage = "Insufficient BNB balance for gas fee";
-      } else if (error.message.includes('nonce too low')) {
-        errorMessage = "Transaction nonce error, please try again";
-      } else if (error.message.includes('gas required exceeds allowance')) {
-        errorMessage = "Insufficient gas limit";
-      } else if (error.message.includes('execution reverted')) {
-        errorMessage = "Contract execution failed - please check conditions again";
-      }
-
-      throw new Error(`Error upgrading plan: ${errorMessage}`);
+      throw new Error(`Error building register transaction: ${error.message}`);
     }
   }
 
-  translateContractError(reason) {
-    const errorMap = {
-      'AlreadyMember': 'You are already a member',
-      'Plan1Only': 'New members must start from Plan 1 only',
-      'UplineNotMember': 'Upline is not a member',
-      'UplinePlanLow': 'Upline has a lower plan than you want to register',
-      'Paused': 'System is temporarily paused',
-      'InvalidAmount': 'Invalid amount',
-      'NotMember': 'You are not a member yet',
-      'NextPlanOnly': 'Must upgrade one plan at a time only',
-      'InactivePlan': 'Plan is not active',
-      'InvalidPlanID': 'Invalid Plan ID',
-      'ZeroAddress': 'Invalid address',
-      'ZeroPrice': 'Invalid price',
-      'LowOwnerBalance': 'Insufficient Owner Balance',
-      'LowFeeBalance': 'Insufficient Fee Balance',
-      'LowFundBalance': 'Insufficient Fund Balance',
-      'ThirtyDayLock': 'Must wait 30 days after registration before exiting system',
-      'TimelockActive': 'Still in timelock period',
-      'NoRequest': 'No emergency request',
-      'ZeroBalance': 'Zero balance',
-      'NonTransferable': 'NFT is not transferable',
-      'ReentrantTransfer': 'Reentrant transfer',
-      'EmptyURI': 'Empty URI'
-    };
-
-    return errorMap[reason] || reason;
+  // à¸ªà¸£à¹‰à¸²à¸‡ transaction data à¸ªà¸³à¸«à¸£à¸±à¸šà¸à¸²à¸£à¸­à¸±à¸žà¹€à¸à¸£à¸”
+  buildUpgradeTransaction(newPlanId) {
+    try {
+      const data = this.contractInterface.encodeFunctionData('upgradePlan', [newPlanId]);
+      
+      return {
+        to: config.contractAddress,
+        data: data,
+        value: '0x0',
+        gasLimit: ethers.toBeHex(config.gasLimit),
+        gasPrice: ethers.toBeHex(config.gasPrice)
+      };
+    } catch (error) {
+      throw new Error(`Error building upgrade transaction: ${error.message}`);
+    }
   }
 
+  // à¸ªà¸£à¹‰à¸²à¸‡ transaction data à¸ªà¸³à¸«à¸£à¸±à¸šà¸à¸²à¸£ approve USDT
+  buildApproveTransaction(amount) {
+    try {
+      const data = this.usdtInterface.encodeFunctionData('approve', [config.contractAddress, amount]);
+      
+      return {
+        to: config.usdtContractAddress,
+        data: data,
+        value: '0x0',
+        gasLimit: ethers.toBeHex(200000), // approve à¹ƒà¸Šà¹‰ gas à¸™à¹‰à¸­à¸¢à¸à¸§à¹ˆà¸²
+        gasPrice: ethers.toBeHex(config.gasPrice)
+      };
+    } catch (error) {
+      throw new Error(`Error building approve transaction: ${error.message}`);
+    }
+  }
+
+  // à¸•à¸£à¸§à¸ˆà¸ªà¸­à¸šà¸ªà¸–à¸²à¸™à¸° transaction
   async checkTransactionStatus(txHash) {
     try {
       const tx = await this.provider.getTransaction(txHash);
@@ -496,7 +294,8 @@ class ContractService {
       if (!receipt) {
         return {
           status: 'pending',
-          message: 'Transaction pending'
+          message: 'Transaction pending',
+          explorerUrl: this.getExplorerUrl(txHash)
         };
       }
 
@@ -504,13 +303,17 @@ class ContractService {
         return {
           status: 'success',
           message: 'Transaction successful',
-          receipt
+          receipt,
+          explorerUrl: this.getExplorerUrl(txHash),
+          blockNumber: receipt.blockNumber,
+          gasUsed: receipt.gasUsed.toString()
         };
       } else {
         return {
           status: 'failed',
           message: 'Transaction failed',
-          receipt
+          receipt,
+          explorerUrl: this.getExplorerUrl(txHash)
         };
       }
     } catch (error) {
@@ -521,7 +324,30 @@ class ContractService {
     }
   }
 
-  // Admin functions
+  // à¸£à¸­à¹ƒà¸«à¹‰ transaction confirm (à¸ªà¸³à¸«à¸£à¸±à¸š polling)
+  async waitForTransactionConfirmation(txHash, maxWaitTime = 300000) { // 5 minutes
+    const startTime = Date.now();
+    
+    while (Date.now() - startTime < maxWaitTime) {
+      const status = await this.checkTransactionStatus(txHash);
+      
+      if (status.status === 'success') {
+        return status;
+      } else if (status.status === 'failed') {
+        throw new Error(`Transaction failed: ${status.message}`);
+      } else if (status.status === 'error') {
+        throw new Error(`Transaction error: ${status.message}`);
+      }
+      
+      // à¸£à¸­ 5 à¸§à¸´à¸™à¸²à¸—à¸µà¸à¹ˆà¸­à¸™à¹€à¸Šà¹‡à¸„à¸­à¸µà¸à¸„à¸£à¸±à¹‰à¸‡
+      await new Promise(resolve => setTimeout(resolve, 5000));
+    }
+    
+    throw new Error('Transaction confirmation timeout');
+  }
+
+  // === ADMIN FUNCTIONS (à¹ƒà¸Šà¹‰ private key à¹€à¸«à¸¡à¸·à¸­à¸™à¹€à¸”à¸´à¸¡) ===
+
   async updatePlanPrice(planId, newPrice) {
     if (!this.adminContract) {
       throw new Error('Admin private key not configured');
@@ -692,10 +518,10 @@ class ContractService {
     }
   }
 
-  // Utility functions
+  // === UTILITY FUNCTIONS ===
+
   async formatPrice(price, decimals = null) {
     if (decimals === null) {
-      // Use USDT decimals if not specified
       try {
         const usdtDecimals = await this.usdtContract.decimals();
         return ethers.formatUnits(price, usdtDecimals);
@@ -709,7 +535,6 @@ class ContractService {
 
   async parsePrice(price, decimals = null) {
     if (decimals === null) {
-      // Use USDT decimals if not specified
       try {
         const usdtDecimals = await this.usdtContract.decimals();
         return ethers.parseUnits(price, usdtDecimals);
@@ -727,6 +552,81 @@ class ContractService {
 
   getExplorerUrl(txHash) {
     return `${config.explorerUrl}/tx/${txHash}`;
+  }
+
+  // === ERROR TRANSLATION ===
+
+  translateContractError(reason) {
+    const errorMap = {
+      'AlreadyMember': 'You are already a member',
+      'Plan1Only': 'New members must start from Plan 1 only',
+      'UplineNotMember': 'Upline is not a member',
+      'UplinePlanLow': 'Upline has a lower plan than you want to register',
+      'Paused': 'System is temporarily paused',
+      'InvalidAmount': 'Invalid amount',
+      'NotMember': 'You are not a member yet',
+      'NextPlanOnly': 'Must upgrade one plan at a time only',
+      'InactivePlan': 'Plan is not active',
+      'InvalidPlanID': 'Invalid Plan ID',
+      'ZeroAddress': 'Invalid address',
+      'ZeroPrice': 'Invalid price',
+      'LowOwnerBalance': 'Insufficient Owner Balance',
+      'LowFeeBalance': 'Insufficient Fee Balance',
+      'LowFundBalance': 'Insufficient Fund Balance',
+      'ThirtyDayLock': 'Must wait 30 days after registration before exiting system',
+      'TimelockActive': 'Still in timelock period',
+      'NoRequest': 'No emergency request',
+      'ZeroBalance': 'Zero balance',
+      'NonTransferable': 'NFT is not transferable',
+      'ReentrantTransfer': 'Reentrant transfer',
+      'EmptyURI': 'Empty URI'
+    };
+
+    return errorMap[reason] || reason;
+  }
+
+  // === GAS ESTIMATION ===
+  
+  async estimateGas(transactionData) {
+    try {
+      const gasEstimate = await this.provider.estimateGas({
+        to: transactionData.to,
+        data: transactionData.data,
+        value: transactionData.value || '0x0'
+      });
+
+      // à¹€à¸žà¸´à¹ˆà¸¡ buffer 20%
+      const gasWithBuffer = (gasEstimate * BigInt(120)) / BigInt(100);
+      
+      return {
+        estimated: gasEstimate.toString(),
+        withBuffer: gasWithBuffer.toString(),
+        formatted: ethers.formatUnits(gasWithBuffer * BigInt(config.gasPrice), 'ether') + ' BNB'
+      };
+    } catch (error) {
+      throw new Error(`Gas estimation failed: ${error.message}`);
+    }
+  }
+
+  // === NETWORK HELPERS ===
+
+  async getNetworkInfo() {
+    try {
+      const network = await this.provider.getNetwork();
+      const blockNumber = await this.provider.getBlockNumber();
+      const feeData = await this.provider.getFeeData();
+
+      return {
+        chainId: network.chainId.toString(),
+        name: network.name,
+        blockNumber,
+        gasPrice: feeData.gasPrice?.toString(),
+        maxFeePerGas: feeData.maxFeePerGas?.toString(),
+        maxPriorityFeePerGas: feeData.maxPriorityFeePerGas?.toString()
+      };
+    } catch (error) {
+      throw new Error(`Error getting network info: ${error.message}`);
+    }
   }
 }
 
